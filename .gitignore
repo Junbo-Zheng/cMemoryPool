@@ -3,3 +3,5 @@ main
 *.dep
 ./src/*.o
  *.exe
+
+build

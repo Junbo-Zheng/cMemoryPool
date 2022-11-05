@@ -1,5 +1,7 @@
 #include "./src/malloc.h"
 
+#include <stdio.h>
+
 int main(void)
 {
     mymem_init(SRAMIN);
@@ -9,13 +11,20 @@ int main(void)
     mymem_init(SRAMEX2);
 
     uint8_t *ptr = MYMALLOC(SRAMCCM, 12);
-    printf("ptr is %p\r\n", ptr);
-
-    printf("count is %d\r\n", mem_perused(SRAMCCM));
+    if (ptr) {
+        printf("ptr malloc ok, addr: %p\r\n", ptr);
+        printf("ptr memory use info: %d%%\r\n", mem_perused(SRAMCCM));
+    } else {
+        printf("ptr malloc fail\n");
+    }
 
     uint8_t *ptr1 = MYMALLOC(SRAMCCM, 10);
-    printf("ptr1 is %p\r\n", ptr1);
+    if (ptr1) {
+        printf("ptr1 malloc ok, addr: %p\n", ptr1);
+        printf("ptr1 memory use info: %d%%\r\n", mem_perused(SRAMCCM));
+    } else {
+        printf("ptr1 malloc fail\n");
+    }
 
-    printf("hello world\r\n");
-    return 0x00;
+    return 0;
 }
