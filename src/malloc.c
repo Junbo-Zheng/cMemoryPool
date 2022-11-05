@@ -74,7 +74,7 @@ static struct  {
     MEMPOOL_INIT_READY
 };
 
-pthread_mutex_t mutex[SRAMBANK] = { 0 };
+static pthread_mutex_t mutex[SRAMBANK] = { 0 };
 
 static void mutex_creat(uint8_t memx)
 {
@@ -89,6 +89,61 @@ static void mutex_lock(uint8_t memx)
 static void mutex_unlock(uint8_t memx)
 {
     pthread_mutex_unlock(&mutex[memx]);
+}
+
+static uint32_t mymem_malloc(uint8_t memx, uint32_t size)
+{
+    if (malloc_dev.memready[memx] == MEMPOOL_INIT_READY) {
+        malloc_dev.init(memx);
+    }
+
+    if (size == 0) {
+        return 0xffffffff;
+    }
+
+    uint16_t need_block_count = size / memblocksize[memx];
+    if (size % memblocksize[memx]) {
+        need_block_count++;
+    }
+
+    uint16_t empty_block_size = 0;
+    for (int32_t offset = (memtablesize[memx] - 1); offset >= 0; offset--) {
+        if (offset < 0) {
+            return 0xffffffff;
+        }
+
+        empty_block_size = (malloc_dev.memtable[memx][offset] == 0)
+                               ? (empty_block_size + 1)
+                               : 0;
+
+        if (empty_block_size == need_block_count) {
+            for (uint32_t i = 0; i < need_block_count; i++) {
+                malloc_dev.memtable[memx][offset + i] = need_block_count;
+            }
+            /* offset address */
+            return (offset * memblocksize[memx]);
+        }
+    }
+
+    return 0xffffffff;
+}
+
+static uint8_t mymem_free(uint8_t memx, uint32_t offset)
+{
+    if (!malloc_dev.memready[memx]) {
+        malloc_dev.init(memx);
+        return 1;
+    }
+
+    if (offset < mempoolsize[memx]) {
+        int index = offset / memblocksize[memx];
+        int nmemb = malloc_dev.memtable[memx][index];
+        for (uint16_t i = 0; i < nmemb; i++) {
+            malloc_dev.memtable[memx][index + i] = 0;
+        }
+        return 0;
+    }
+    return 2;
 }
 
 void mymemcpy(void* des, void* src, uint32_t n)
@@ -132,65 +187,6 @@ uint8_t mem_perused(uint8_t memx)
     }
 
     return (used * 100) / (memtablesize[memx]);
-}
-
-uint32_t mymem_malloc(uint8_t memx, uint32_t size)
-{
-    if (malloc_dev.memready[memx] == MEMPOOL_INIT_READY) {
-        malloc_dev.init(memx);
-    }
-
-    if (size == 0) {
-        return 0xffffffff;
-    }
-
-    uint16_t need_block_count = size / memblocksize[memx];
-    if (size % memblocksize[memx]) {
-        need_block_count++;
-    }
-
-    uint16_t empty_block_size = 0;
-    for (int32_t offset = (memtablesize[memx] - 1); offset >= 0; offset--) {
-        if (offset < 0) {
-            return 0xffffffff;
-        }
-
-        empty_block_size = (malloc_dev.memtable[memx][offset] == 0)
-                               ? (empty_block_size + 1)
-                               : 0;
-
-        if (empty_block_size == need_block_count) {
-            for (uint32_t i = 0; i < need_block_count; i++) {
-                malloc_dev.memtable[memx][offset + i] = need_block_count;
-            }
-            /* offset address */
-            return (offset * memblocksize[memx]);
-        }
-    }
-
-    return 0xffffffff;
-}
-
-//释放内存(内部调用)
-// memx:所属内存块
-// offset:内存地址偏移
-//返回值:0,释放成功;1,释放失败;
-uint8_t mymem_free(uint8_t memx, uint32_t offset)
-{
-    if (!malloc_dev.memready[memx]) {
-        malloc_dev.init(memx);
-        return 1;
-    }
-
-    if (offset < mempoolsize[memx]) {
-        int index = offset / memblocksize[memx]; //偏移所在内存块号码
-        int nmemb = malloc_dev.memtable[memx][index]; //内存块数量
-        for (uint16_t i = 0; i < nmemb; i++) {
-            malloc_dev.memtable[memx][index + i] = 0;
-        }
-        return 0;
-    }
-    return 2; //偏移超区了
 }
 
 void myfree(void* ptr, char* file_name, uint32_t func_line)
