@@ -11,6 +11,12 @@ set(SRC
 
 set(CMAKE_C_FLAGS "-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer -static-libsan")
 
+option(MEMORY_POOL_DEBUG "memory pool debug"  OFF)
+
+if(MEMORY_POOL_DEBUG)
+  target_compile_definitions(adbd PUBLIC -DCONFIG_MEMORY_POOL_DEBUG)
+endif()
+
 add_executable(mem_pool ${SRC})
 
 add_compile_options(-Wall -Wextra -Werror -Wno-format -g)
