@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include <pthread.h>
+
 #define MEMPOOL_INIT_READY 0
 #define MEMPOOL_INIT_DONE  1
 
@@ -496,19 +498,21 @@ bool printf_tracer_info(void)
 
 #endif
 
+static pthread_mutex_t mutex[SRAMBANK] = { 0 };
+
 static void mutex_creat(uint8_t memx)
 {
-
+    pthread_mutex_init(&mutex[memx], NULL);
 }
 
-static void mutex_pend(uint8_t memx)
+static void mutex_lock(uint8_t memx)
 {
-
+    pthread_mutex_lock(&mutex[memx]);
 }
 
-static void mutex_post(uint8_t memx)
+static void mutex_unlock(uint8_t memx)
 {
-
+    pthread_mutex_unlock(&mutex[memx]);
 }
 
 void mymemcpy(void* des, void* src, uint32_t n)
@@ -639,14 +643,14 @@ void myfree(void* ptr, char* file_name, uint32_t func_line)
     }
 
     if (memx != 0xff) {
-        mutex_pend(memx);
+        mutex_lock(memx);
 
         uint32_t offset = (uintptr_t)ptr - (uintptr_t)malloc_dev.mempool[memx];
         mymem_free(memx, offset);
 #if CONFIG_MEMORY_POOL_DEBUG
         del_a_tracer_record(ptr, get_filename(file_name), func_line);
 #endif
-        mutex_post(memx);
+        mutex_unlock(memx);
     }
 
     ptr = NULL;
@@ -654,7 +658,7 @@ void myfree(void* ptr, char* file_name, uint32_t func_line)
 
 void* mymalloc(uint8_t memx, uint32_t size, char* file_name, uint32_t func_line)
 {
-    mutex_pend(memx);
+    mutex_lock(memx);
     void* addr = NULL;
 
     uint32_t offset = mymem_malloc(memx, size);
@@ -666,25 +670,25 @@ void* mymalloc(uint8_t memx, uint32_t size, char* file_name, uint32_t func_line)
 #endif
     }
 
-    mutex_post(memx);
+    mutex_unlock(memx);
     return addr;
 }
 
 #if 0
 void* myrealloc(uint8_t memx, void* ptr, uint32_t size)
 {
-    mutex_pend(memx);
+    mutex_lock(memx);
     uint32_t offset = mymem_malloc(memx, size);
     if (offset != 0xffffffff) {
         mymemcpy((void*)((uintptr_t)malloc_dev.mempool[memx] + offset), ptr,
                  size);
         MYFREE(ptr);
         ptr = NULL;
-        mutex_post(memx);
+        mutex_unlock(memx);
 
         return (void*)((uintptr_t)malloc_dev.mempool[memx] + offset);
     }
-    mutex_post(memx);
+    mutex_unlock(memx);
     return NULL;
 }
 #endif
