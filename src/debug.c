@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <pthread.h>
+
 #include "malloc.h"
 
 #define TRACER_NODE_NUM   (1000)
@@ -71,27 +73,21 @@ typedef struct _tracer_list {
 EXTRAM tracer_node_t tracer_node[TRACER_NODE_NUM];
 EXTRAM tracer_list_t tracer_list;
 
-// OS_MUTEX tracer_mtx;
-// OS_MUTEX MallocMutex[SRAMBANK];
+static pthread_mutex_t mutex = { 0 };
 
-static void init_mtx(void)
+static void debug_mutex_init(void)
 {
-    // OS_ERR os_err;
-    // OSMutexCreate(&tracer_mtx, (CPU_CHAR*)"tracer_mtx", &os_err);
+    pthread_mutex_init(&mutex, NULL);
 }
 
-static void pend_mtx(void)
+static void debug_mutex_lock(void)
 {
-    // OS_ERR os_err;
-    // if (OSRunning != OS_STATE_OS_RUNNING) return;
-    // OSMutexPend(&tracer_mtx, 0, OS_OPT_PEND_BLOCKING, 0, &os_err);
+    pthread_mutex_lock(&mutex);
 }
 
-static void post_mtx(void)
+static void debug_mutex_unlock(void)
 {
-    // OS_ERR os_err;
-    // if (OSRunning != OS_STATE_OS_RUNNING) return;
-    // OSMutexPost(&tracer_mtx, OS_OPT_POST_NO_SCHED, &os_err);
+    pthread_mutex_unlock(&mutex);
 }
 
 static void init_tracer(void)
@@ -122,7 +118,7 @@ static void init_tracer(void)
     tracer_list.used_node_hd.p_tail   = NULL;
     tracer_list.used_node_hd.node_cnt = 0;
 
-    init_mtx();
+    debug_mutex_init();
 }
 
 //从链表头上申请一个节点
@@ -213,12 +209,12 @@ p_tracer_node_t find_and_remove_node(p_tracer_node_hd_t p_node_hd,
 bool add_a_tracer_record(uint8_t memx, uint16_t mem_sz, void* malloc_ptr,
                          char* file_name, uint32_t func_line)
 {
-    pend_mtx();
+    debug_mutex_lock();
 
     tracer_list.malloc_free_cnt++;
 
     if (memx > SRAMBANK) {
-        post_mtx();
+        debug_mutex_unlock();
         return false;
     }
 
@@ -227,7 +223,7 @@ bool add_a_tracer_record(uint8_t memx, uint16_t mem_sz, void* malloc_ptr,
     if (p_node == NULL) {
         tracer_list.flag |= BIT_MASK_FREEEMPTY;
         tracer_list.flag |= BIT_MASK_OVERFLOW;
-        post_mtx();
+        debug_mutex_unlock();
         return false;
     }
 
@@ -239,14 +235,14 @@ bool add_a_tracer_record(uint8_t memx, uint16_t mem_sz, void* malloc_ptr,
 
     bool res = insert_node(&tracer_list.used_node_hd, p_node);
 
-    post_mtx();
+    debug_mutex_unlock();
     return res;
 }
 
 //删除一个tracer记录
 bool del_a_tracer_record(void* malloc_ptr, char* file_name, uint32_t func_line)
 {
-    pend_mtx();
+    debug_mutex_lock();
 
     tracer_list.malloc_free_cnt--;
 
@@ -269,17 +265,17 @@ bool del_a_tracer_record(void* malloc_ptr, char* file_name, uint32_t func_line)
                 tracer_list.refree_statistic.cnt++;
             }
         }
-        post_mtx();
+        debug_mutex_unlock();
         return false;
     }
 
     if (insert_node(&tracer_list.free_node_hd, p_node) == true) {
         tracer_list.flag &= (~BIT_MASK_FREEEMPTY);
-        post_mtx();
+        debug_mutex_unlock();
         return true;
     }
 
-    post_mtx();
+    debug_mutex_unlock();
     return false;
 }
 
@@ -313,7 +309,7 @@ bool printf_tracer_info(void)
 {
     static uint8_t print_buf[1024];
 
-    pend_mtx();
+    debug_mutex_lock();
     //重要，信号量保护段内不能有日志输出，否则会造成获取信号量嵌套导致死机!!!!!!!!
 
     int32_t  malloc_free_cnt = tracer_list.malloc_free_cnt;
@@ -358,16 +354,16 @@ bool printf_tracer_info(void)
         p_node = p_node->p_next;
     }
 
-    post_mtx();
+    debug_mutex_unlock();
 
     printf("tracer_list.malloc_free_cnt = %d, tracer_list.flag = 0x%04x, "
-               "free node cnt = %u, used node cnt = %u",
-               malloc_free_cnt, flag, free_node_cnt, used_node_cnt);
+           "free node cnt = %u, used node cnt = %u",
+           malloc_free_cnt, flag, free_node_cnt, used_node_cnt);
 
     printf("SRAMIN:%u\tSRAMEX:%u\tSRAMCCM:%u\tSRAMEX1:%u\tSRAMEX2:%u\t",
-               tracer_list.mem_statistic[0], tracer_list.mem_statistic[1],
-               tracer_list.mem_statistic[2], tracer_list.mem_statistic[3],
-               tracer_list.mem_statistic[4]);
+           tracer_list.mem_statistic[0], tracer_list.mem_statistic[1],
+           tracer_list.mem_statistic[2], tracer_list.mem_statistic[3],
+           tracer_list.mem_statistic[4]);
 
     uint8_t* p_buf  = print_buf;
              p_buf += sprintf((R_Str)p_buf, "malloc : ");
@@ -396,8 +392,7 @@ bool printf_tracer_info(void)
     }
 
     if (tracer_list.refree_statistic.cnt) {
-        printf("refree pointer,total %u:",
-                   tracer_list.refree_statistic.cnt);
+        printf("refree pointer,total %u:", tracer_list.refree_statistic.cnt);
     }
 
     p_buf  = print_buf;
