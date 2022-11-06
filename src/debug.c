@@ -1,9 +1,8 @@
 
 #include "debug.h"
 
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #if __linux__
 #include <pthread.h>
@@ -98,7 +97,7 @@ static void debug_mutex_unlock(void)
 #endif
 }
 
-static void init_tracer(void)
+void init_tracer(void)
 {
     //清空list
     memset((void*)&tracer_list, 0, sizeof(tracer_list_t));
@@ -290,24 +289,12 @@ bool del_a_tracer_record(void* malloc_ptr, char* file_name, uint32_t func_line)
 //从绝对路径中获取文件名
 char* get_filename(char* path)
 {
-    char* ptr = path;
-
-    // find tail
-    while (*ptr) {
-        ptr++;
-    }
-
-    // find the last '\\'
-    while (*ptr != '\\') {
-        *ptr--;
-
-        if (ptr == path) {
-            return ptr;
-        }
-    }
-
-    ptr++;
-    return ptr;
+#if __linux__
+    char* ptr = strrchr(path, '/');
+#else
+    char* ptr = strrchr(path, '\');
+#endif
+    return ptr + 1;
 }
 
 //获取信息
@@ -374,11 +361,11 @@ bool printf_tracer_info(void)
            tracer_list.mem_statistic[4]);
 
     uint8_t* p_buf  = print_buf;
-             p_buf += sprintf((R_Str)p_buf, "malloc : ");
+             p_buf += sprintf((char *)p_buf, "malloc : ");
     for (uint16_t i = 0, j = 0; i < TRACER_INDEX_NUM; i++) {
         if (tracer_list.repeat_statistic[i].cnt) {
             j++;
-            p_buf += sprintf((R_Str)p_buf, "%s(%u)=%u\t",
+            p_buf += sprintf((char *)p_buf, "%s(%u)=%u\t",
                              tracer_list.repeat_statistic[i].pos_info.file_name,
                              tracer_list.repeat_statistic[i].pos_info.func_line,
                              tracer_list.repeat_statistic[i].cnt);
@@ -388,13 +375,13 @@ bool printf_tracer_info(void)
             j     = 0;
             p_buf = print_buf;
             printf("%s", p_buf);
-            p_buf += sprintf((R_Str)p_buf, "malloc : ");
+            p_buf += sprintf((char *)p_buf, "malloc : ");
         } else {
             if ((i == (TRACER_INDEX_NUM - 1)) && j) {
                 j     = 0;
                 p_buf = print_buf;
                 printf("%s", p_buf);
-                p_buf += sprintf((R_Str)p_buf, "malloc : ");
+                p_buf += sprintf((char *)p_buf, "malloc : ");
             }
         }
     }
@@ -404,12 +391,12 @@ bool printf_tracer_info(void)
     }
 
     p_buf  = print_buf;
-    p_buf += sprintf((R_Str)p_buf, "refree: ");
+    p_buf += sprintf((char *)p_buf, "refree: ");
     for (uint16_t i = 0, j = 0; i < TRACER_REFREE_NUM; i++) {
         if (tracer_list.refree_statistic.pos_info[i].file_name) {
             j++;
             p_buf
-                += sprintf((R_Str)p_buf, "%s(%u)\t",
+                += sprintf((char *)p_buf, "%s(%u)\t",
                            tracer_list.refree_statistic.pos_info[i].file_name,
                            tracer_list.refree_statistic.pos_info[i].func_line);
         }
@@ -418,13 +405,13 @@ bool printf_tracer_info(void)
             j     = 0;
             p_buf = print_buf;
             printf("%s", p_buf);
-            p_buf += sprintf((R_Str)p_buf, "refree: ");
+            p_buf += sprintf((char *)p_buf, "refree: ");
         } else {
             if ((i == (TRACER_REFREE_NUM - 1)) && j) {
                 j     = 0;
                 p_buf = print_buf;
                 printf("%s", p_buf);
-                p_buf += sprintf((R_Str)p_buf, "refree: ");
+                p_buf += sprintf((char *)p_buf, "refree: ");
             }
         }
     }

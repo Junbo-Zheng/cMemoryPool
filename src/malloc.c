@@ -7,6 +7,10 @@
 #include <pthread.h>
 #endif
 
+#if CONFIG_MEMORY_POOL_DEBUG
+#include "debug.h"
+#endif
+
 #define MEMPOOL_INIT_READY 0
 #define MEMPOOL_INIT_DONE  1
 
