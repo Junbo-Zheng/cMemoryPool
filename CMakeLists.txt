@@ -15,6 +15,7 @@ option(MEMORY_POOL_DEBUG "memory pool debug"  OFF)
 
 if(MEMORY_POOL_DEBUG)
   target_compile_definitions(adbd PUBLIC -DCONFIG_MEMORY_POOL_DEBUG)
+  set(SRC ${SRC} src/debug.c)
 endif()
 
 add_executable(mem_pool ${SRC})
