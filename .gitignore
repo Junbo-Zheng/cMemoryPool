@@ -5,3 +5,6 @@ main
  *.exe
 
 build
+
+.DS_Store
+.github/.DS_Store
