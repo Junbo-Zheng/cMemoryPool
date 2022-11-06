@@ -13,10 +13,16 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install cmake clang gcc
+          sudo apt-get install cmake gcc
 
       - name: build project
         run: |
           cmake -H. -Bbuild
+          cd build
+          make -j8
+
+      - name: build test
+        run: |
+          cmake -H. -Bbuild -DMEMORY_POOL_DEBUG=ON
           cd build
           make -j8
