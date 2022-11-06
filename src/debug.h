@@ -4,17 +4,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#ifndef __PACKED
-#define __PACKED __attribute__((packed))
-#endif
+void memory_pool_debug_init(void);
 
-void init_tracer(void);
+bool memory_pool_debug_add(uint8_t memx, uint32_t mem_sz, void* malloc_ptr,
+                           char* file_name, uint32_t func_line);
 
-bool del_a_tracer_record(void* malloc_ptr, char* file_name, uint32_t func_line);
+bool memory_pool_debug_del(void* malloc_ptr, char* file_name,
+                           uint32_t func_line);
 
-char* get_filename(char* path);
+int32_t memory_pool_debug_malloc_free_count(void);
 
-bool add_a_tracer_record(uint8_t memx, uint16_t mem_sz, void* malloc_ptr,
-                         char* file_name, uint32_t func_line);
+void memory_pool_debug_trace(void);
 
 #endif /* _DEBUG_H_ */
