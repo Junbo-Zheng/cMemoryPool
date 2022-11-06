@@ -10,71 +10,77 @@
 
 #include "malloc.h"
 
-#define TRACER_NODE_NUM   (1000)
+#define TRACER_NODE_NUM   (256)
 #define TRACER_MEMX_NUM   (SRAMBANK)
-#define TRACER_INDEX_NUM  (256)
+#define TRACER_REPEAT_NUM (256)
 #define TRACER_REFREE_NUM (100)
 
 #if TRACER_MEMX_NUM > SRAMBANK
 #error "TRACER_MEMX_NUM error"
 #endif
 
-#if TRACER_INDEX_NUM > 256
-#error "TRACER_INDEX_NUM error"
+#if TRACER_REPEAT_NUM > 512
+#error "TRACER_REPEAT_NUM error"
 #endif
 
-#if TRACER_REFREE_NUM > 65535
+#if TRACER_REFREE_NUM > 512
 #error "TRACER_REFREE_NUM error"
 #endif
 
-// bit flag mask
-#define BIT_MASK_FREEEMPTY (0x0001)  // 可用记录条数为0
-#define BIT_MASK_OVERFLOW  (0x0002)  // tracer资源溢出过
+#ifndef __PACKED
+#define __PACKED __attribute__((packed))
+#endif
 
-typedef struct _tracer_node {
-    struct _tracer_node* p_next;
+#define BIT_MASK_EMPTY     (0x01)  /* used node is empty */
+#define BIT_MASK_OVERFLOW  (0x02)
+
+typedef struct tracer_node {
+    struct tracer_node* p_next;
     char*    file_name;
     uint32_t func_line;
     void*    malloc_ptr;
-    uint16_t mem_sz;
+    uint32_t mem_sz;
     uint8_t  memx;
-} __PACKED tracer_node_t, *p_tracer_node_t;
+} __PACKED tracer_node_t;
 
-typedef struct _tracer_node_hd {
-    p_tracer_node_t p_next;
-    p_tracer_node_t p_tail;
-    uint16_t        node_cnt;
-} __PACKED tracer_node_hd_t, *p_tracer_node_hd_t;
+typedef struct {
+    tracer_node_t* p_next;
+    tracer_node_t* p_tail;
+    uint16_t       count;
+} __PACKED tracer_node_data_t;
 
-typedef struct _pos_info {
+typedef struct {
     char*    file_name;
     uint32_t func_line;
-} __PACKED pos_info_t, *p_pos_info_t;
+} __PACKED pos_info_t;
 
-typedef struct _repeat_statistic {
+typedef struct {
     pos_info_t pos_info;
-    uint16_t   cnt;
-} __PACKED repeat_statistic_t, *p_repeat_statistic_t;
+    uint16_t   count;
+} __PACKED repeat_statistic_t;
 
-typedef struct _refree_statistic {
+typedef struct {
     pos_info_t pos_info[TRACER_REFREE_NUM];
-    uint16_t   cnt;
-} __PACKED refree_statistic_t, *p_refree_statistic_t;
+    uint16_t   count;
+} __PACKED refree_statistic_t;
 
-typedef struct _tracer_list {
-    tracer_node_hd_t   used_node_hd;
-    tracer_node_hd_t   free_node_hd;
+typedef struct {
+    bool init;
+    tracer_node_data_t used_node;    /* used node from unused node */
+    tracer_node_data_t unused_node;  /* unused node, not free memory node */
     int32_t            malloc_free_cnt;
     uint32_t           mem_statistic[TRACER_MEMX_NUM];
-    repeat_statistic_t repeat_statistic[TRACER_INDEX_NUM];
+    repeat_statistic_t repeat_statistic[TRACER_REPEAT_NUM];
     refree_statistic_t refree_statistic;
     uint16_t           flag;
-} __PACKED tracer_list_t, *p_tracer_list_t;
+} __PACKED tracer_list_t;
 
-EXTRAM tracer_node_t tracer_node[TRACER_NODE_NUM];
-EXTRAM tracer_list_t tracer_list;
+static EXTRAM tracer_node_t tracer_node[TRACER_NODE_NUM] = { 0 };
+static EXTRAM tracer_list_t tracer_list = { 0 };
 
+#if __linux__
 static pthread_mutex_t mutex = { 0 };
+#endif
 
 static void debug_mutex_init(void)
 {
@@ -97,12 +103,17 @@ static void debug_mutex_unlock(void)
 #endif
 }
 
-void init_tracer(void)
+static char* get_filename(const char* path);
+
+void memory_pool_debug_init(void)
 {
-    //清空list
+    if (tracer_list.init == true) {
+        return;
+    }
+
     memset((void*)&tracer_list, 0, sizeof(tracer_list_t));
 
-    //初始化free链表
+    /* init free list */
     for (uint16_t i = 0; i < (TRACER_NODE_NUM - 1); i++) {
         tracer_node[i].p_next     = &tracer_node[i + 1];
         tracer_node[i].file_name  = NULL;
@@ -118,35 +129,37 @@ void init_tracer(void)
     tracer_node[TRACER_NODE_NUM - 1].mem_sz     = 0;
     tracer_node[TRACER_NODE_NUM - 1].memx       = 0;
 
-    tracer_list.free_node_hd.p_next   = tracer_node;
-    tracer_list.free_node_hd.p_tail   = tracer_node + TRACER_NODE_NUM - 1;
-    tracer_list.free_node_hd.node_cnt = TRACER_NODE_NUM;
-    tracer_list.used_node_hd.p_next   = NULL;
-    tracer_list.used_node_hd.p_tail   = NULL;
-    tracer_list.used_node_hd.node_cnt = 0;
+    tracer_list.unused_node.p_next = tracer_node;
+    tracer_list.unused_node.p_tail = tracer_node + TRACER_NODE_NUM - 1;
+    tracer_list.unused_node.count  = TRACER_NODE_NUM;
+
+    tracer_list.used_node.p_next = NULL;
+    tracer_list.used_node.p_tail = NULL;
+    tracer_list.used_node.count  = 0;
 
     debug_mutex_init();
+
+    tracer_list.init = true;
 }
 
-//从链表头上申请一个节点
-p_tracer_node_t remove_node(p_tracer_node_hd_t p_node_hd)
+static tracer_node_t* alloc_unused_node(tracer_node_data_t* p_node_data)
 {
-    if (p_node_hd == NULL) {
+    if (p_node_data == NULL) {
         return NULL;
     }
 
-    p_tracer_node_t p_node;
-    if (p_node_hd->p_next) {
-        p_node            = p_node_hd->p_next;
-        p_node_hd->p_next = p_node->p_next;
-        if (p_node_hd->p_next == NULL) {
-            p_node_hd->p_tail = NULL;
+    tracer_node_t* p_node = NULL;
+    if (p_node_data->p_next) {
+        p_node = p_node_data->p_next;
+        p_node_data->p_next = p_node->p_next;
+        if (p_node_data->p_next == NULL) {
+            p_node_data->p_tail = NULL;
         }
 
         p_node->p_next = NULL;
 
-        if (p_node_hd->node_cnt) {
-            p_node_hd->node_cnt--;
+        if (p_node_data->count) {
+            p_node_data->count--;
         }
 
         return p_node;
@@ -155,66 +168,63 @@ p_tracer_node_t remove_node(p_tracer_node_hd_t p_node_hd)
     return NULL;
 }
 
-//插入链表尾部
-bool insert_node(p_tracer_node_hd_t p_node_hd, p_tracer_node_t p_node)
+static bool insert_node(tracer_node_data_t* p_node_data, tracer_node_t* p_node)
 {
-    if ((p_node_hd == NULL) || (p_node == NULL)) {
+    if ((p_node_data == NULL) || (p_node == NULL)) {
         return false;
     }
 
-    if (p_node_hd->p_next) {
-        p_node_hd->p_tail->p_next = p_node;
+    if (p_node_data->p_next) {
+        p_node_data->p_tail->p_next = p_node;
     } else {
-        p_node_hd->p_next = p_node;
+        p_node_data->p_next = p_node;
     }
-    p_node_hd->p_tail = p_node;
+    p_node_data->p_tail = p_node;
 
     p_node->p_next = NULL;
-    p_node_hd->node_cnt++;
+    p_node_data->count++;
     return true;
 }
 
-//查找并移除一个节点
-p_tracer_node_t find_and_remove_node(p_tracer_node_hd_t p_node_hd,
-                                     void* malloc_ptr)
+static tracer_node_t* find_and_remove_node(tracer_node_data_t* p_node_data,
+                                           void* malloc_ptr)
 {
-    if (p_node_hd == NULL) {
+    if (p_node_data == NULL) {
         return NULL;
     }
 
-    p_tracer_node_t p_node        = p_node_hd->p_next;
-    p_tracer_node_t p_node_former = NULL;
+    tracer_node_t* p_node = p_node_data->p_next;
+    tracer_node_t* p_node_former = NULL;
     while (p_node) {
         if (p_node->malloc_ptr == malloc_ptr) {
             if (p_node_former) {
                 p_node_former->p_next = p_node->p_next;
             } else {
-                p_node_hd->p_next = p_node->p_next;
+                p_node_data->p_next = p_node->p_next;
             }
 
-            if (p_node_hd->p_tail == p_node) {
-                p_node_hd->p_tail = p_node_former;
+            if (p_node_data->p_tail == p_node) {
+                p_node_data->p_tail = p_node_former;
             }
 
             p_node->p_next = NULL;
 
-            if (p_node_hd->node_cnt) {
-                p_node_hd->node_cnt--;
+            if (p_node_data->count) {
+                p_node_data->count--;
             }
 
             return p_node;
         }
 
         p_node_former = p_node;
-        p_node        = p_node->p_next;
+        p_node = p_node->p_next;
     }
 
     return NULL;
 }
 
-//添加一个tracer记录
-bool add_a_tracer_record(uint8_t memx, uint16_t mem_sz, void* malloc_ptr,
-                         char* file_name, uint32_t func_line)
+bool memory_pool_debug_add(uint8_t memx, uint32_t mem_sz, void* malloc_ptr,
+                           char* file_name, uint32_t func_line)
 {
     debug_mutex_lock();
 
@@ -225,59 +235,62 @@ bool add_a_tracer_record(uint8_t memx, uint16_t mem_sz, void* malloc_ptr,
         return false;
     }
 
-    p_tracer_node_t p_node = remove_node(&tracer_list.free_node_hd);
-
+    tracer_node_t* p_node = alloc_unused_node(&tracer_list.unused_node);
     if (p_node == NULL) {
-        tracer_list.flag |= BIT_MASK_FREEEMPTY;
+        tracer_list.flag |= BIT_MASK_EMPTY;
         tracer_list.flag |= BIT_MASK_OVERFLOW;
         debug_mutex_unlock();
         return false;
     }
 
     p_node->malloc_ptr = malloc_ptr;
-    p_node->file_name  = file_name;
+    p_node->file_name  = get_filename(file_name);
     p_node->func_line  = func_line;
     p_node->memx       = memx;
     p_node->mem_sz     = mem_sz;
 
-    bool res = insert_node(&tracer_list.used_node_hd, p_node);
+    bool ret = insert_node(&tracer_list.used_node, p_node);
 
     debug_mutex_unlock();
-    return res;
+    return ret;
 }
 
-//删除一个tracer记录
-bool del_a_tracer_record(void* malloc_ptr, char* file_name, uint32_t func_line)
+bool memory_pool_debug_del(void* malloc_ptr, char* file_name,
+                           uint32_t func_line)
 {
     debug_mutex_lock();
 
     tracer_list.malloc_free_cnt--;
 
-    p_tracer_node_t p_node
-         =  find_and_remove_node(&tracer_list.used_node_hd, malloc_ptr);
+    tracer_node_t* p_node
+        = find_and_remove_node(&tracer_list.used_node, malloc_ptr);
 
     if (p_node == NULL) {
-        //重复释放(没找到节点且used链表没有溢出且used链表又不是空)
+        /* refree the same address, and the used list is not BIT_MASK_OVERFLOW
+         * and is not BIT_MASK_EMPTY
+         */
         if (!(tracer_list.flag & BIT_MASK_OVERFLOW)
-            && (tracer_list.used_node_hd.node_cnt)) {
-            if (tracer_list.refree_statistic.cnt < TRACER_REFREE_NUM) {
+            && (tracer_list.used_node.count)) {
+            if (tracer_list.refree_statistic.count < TRACER_REFREE_NUM) {
                 tracer_list.refree_statistic
-                    .pos_info[tracer_list.refree_statistic.cnt]
+                    .pos_info[tracer_list.refree_statistic.count]
                     .file_name
-                     =  file_name;
+                    = get_filename(file_name);
                 tracer_list.refree_statistic
-                    .pos_info[tracer_list.refree_statistic.cnt]
+                    .pos_info[tracer_list.refree_statistic.count]
                     .func_line
-                     =  func_line;
-                tracer_list.refree_statistic.cnt++;
+                    = func_line;
+                tracer_list.refree_statistic.count++;
             }
         }
         debug_mutex_unlock();
         return false;
     }
 
-    if (insert_node(&tracer_list.free_node_hd, p_node) == true) {
-        tracer_list.flag &= (~BIT_MASK_FREEEMPTY);
+    /* revert malloc ptr to unused node */
+    if (insert_node(&tracer_list.unused_node, p_node)) {
+        /* clear BIT_MASK_EMPTY bit map */
+        tracer_list.flag &= (~BIT_MASK_EMPTY);
         debug_mutex_unlock();
         return true;
     }
@@ -286,60 +299,52 @@ bool del_a_tracer_record(void* malloc_ptr, char* file_name, uint32_t func_line)
     return false;
 }
 
-//从绝对路径中获取文件名
-char* get_filename(char* path)
+int32_t memory_pool_debug_malloc_free_count(void)
 {
-#if __linux__
-    char* ptr = strrchr(path, '/');
-#else
-    char* ptr = strrchr(path, '\');
-#endif
-    return ptr + 1;
+    int32_t count = 0;
+    debug_mutex_lock();
+    count = tracer_list.malloc_free_cnt;
+    debug_mutex_unlock();
+    return count;
 }
 
-//获取信息
-int32_t get_tracer_malloc_free_cnt(void) { return tracer_list.malloc_free_cnt; }
-
-bool printf_tracer_info(void)
+void memory_pool_debug_trace(void)
 {
-    static uint8_t print_buf[1024];
+    uint8_t print_buf[1024] = { 0 };
 
     debug_mutex_lock();
-    //重要，信号量保护段内不能有日志输出，否则会造成获取信号量嵌套导致死机!!!!!!!!
 
     int32_t  malloc_free_cnt = tracer_list.malloc_free_cnt;
     uint8_t  flag            = tracer_list.flag;
-    uint16_t free_node_cnt   = tracer_list.free_node_hd.node_cnt;
-    uint16_t used_node_cnt   = tracer_list.used_node_hd.node_cnt;
+    uint16_t unused_node_cnt = tracer_list.unused_node.count;
+    uint16_t used_node_cnt   = tracer_list.used_node.count;
 
     memset((void*)(tracer_list.mem_statistic), 0,
            sizeof(uint32_t) * TRACER_MEMX_NUM);
     memset((void*)(tracer_list.repeat_statistic), 0,
-           sizeof(repeat_statistic_t) * TRACER_INDEX_NUM);
+           sizeof(repeat_statistic_t) * TRACER_REPEAT_NUM);
 
-    p_tracer_node_t p_node = tracer_list.used_node_hd.p_next;
+    tracer_node_t* p_node = tracer_list.used_node.p_next;
 
     while (p_node) {
         tracer_list.mem_statistic[p_node->memx] += p_node->mem_sz;
 
         int i = 0;
-        while (i < TRACER_INDEX_NUM) {
+        while (i < TRACER_REPEAT_NUM) {
             if (tracer_list.repeat_statistic[i].pos_info.file_name) {
                 if ((tracer_list.repeat_statistic[i].pos_info.file_name
                      == p_node->file_name)
                     && (tracer_list.repeat_statistic[i].pos_info.func_line
                         == p_node->func_line)) {
-                    //找到一个相同的refree节点，统计值加一
-                    tracer_list.repeat_statistic[i].cnt++;
+                    tracer_list.repeat_statistic[i].count++;
                     break;
                 }
             } else {
-                //当前元素为空，说明之前没有相同的refree节点，则新增一个
                 tracer_list.repeat_statistic[i].pos_info.file_name
-                     =  p_node->file_name;
+                    = p_node->file_name;
                 tracer_list.repeat_statistic[i].pos_info.func_line
-                                                        =  p_node->func_line;
-                    tracer_list.repeat_statistic[i].cnt = 1;
+                    = p_node->func_line;
+                tracer_list.repeat_statistic[i].count = 1;
                 break;
             }
 
@@ -351,70 +356,80 @@ bool printf_tracer_info(void)
 
     debug_mutex_unlock();
 
-    printf("tracer_list.malloc_free_cnt = %d, tracer_list.flag = 0x%04x, "
-           "free node cnt = %u, used node cnt = %u",
-           malloc_free_cnt, flag, free_node_cnt, used_node_cnt);
+    printf("tracer_list.malloc_free_cnt = %d\n", malloc_free_cnt);
+    printf("unused node cnt             = %u\n", unused_node_cnt);
+    printf("used   node cnt             = %u\n", used_node_cnt);
+    printf("tracer_list.flag            = 0x%04x\n", flag);
 
-    printf("SRAMIN:%u\tSRAMEX:%u\tSRAMCCM:%u\tSRAMEX1:%u\tSRAMEX2:%u\t",
-           tracer_list.mem_statistic[0], tracer_list.mem_statistic[1],
-           tracer_list.mem_statistic[2], tracer_list.mem_statistic[3],
-           tracer_list.mem_statistic[4]);
+    printf("SRAMIN  : %u\n", tracer_list.mem_statistic[0]);
+    printf("SRAMEX  : %u\n", tracer_list.mem_statistic[1]);
+    printf("SRAMCCM : %u\n", tracer_list.mem_statistic[2]);
+    printf("SRAMEX1 : %u\n", tracer_list.mem_statistic[3]);
+    printf("SRAMEX2 : %u\n", tracer_list.mem_statistic[4]);
 
-    uint8_t* p_buf  = print_buf;
-             p_buf += sprintf((char *)p_buf, "malloc : ");
-    for (uint16_t i = 0, j = 0; i < TRACER_INDEX_NUM; i++) {
-        if (tracer_list.repeat_statistic[i].cnt) {
+    uint8_t* p_buf = print_buf;
+    p_buf += sprintf((char*)p_buf, "malloc : ");
+    for (uint16_t i = 0, j = 0; i < TRACER_REPEAT_NUM; i++) {
+        if (tracer_list.repeat_statistic[i].count) {
             j++;
-            p_buf += sprintf((char *)p_buf, "%s(%u)=%u\t",
+            p_buf += sprintf((char*)p_buf, "%s(%u) = %u\n",
                              tracer_list.repeat_statistic[i].pos_info.file_name,
                              tracer_list.repeat_statistic[i].pos_info.func_line,
-                             tracer_list.repeat_statistic[i].cnt);
+                             tracer_list.repeat_statistic[i].count);
         }
 
         if (j == 4) {
-            j     = 0;
+            j = 0;
             p_buf = print_buf;
             printf("%s", p_buf);
-            p_buf += sprintf((char *)p_buf, "malloc : ");
+            p_buf += sprintf((char*)p_buf, "malloc : ");
         } else {
-            if ((i == (TRACER_INDEX_NUM - 1)) && j) {
-                j     = 0;
+            if ((i == (TRACER_REPEAT_NUM - 1)) && j) {
+                j = 0;
                 p_buf = print_buf;
                 printf("%s", p_buf);
-                p_buf += sprintf((char *)p_buf, "malloc : ");
+                p_buf += sprintf((char*)p_buf, "malloc : ");
             }
         }
     }
 
-    if (tracer_list.refree_statistic.cnt) {
-        printf("refree pointer,total %u:", tracer_list.refree_statistic.cnt);
+    if (tracer_list.refree_statistic.count) {
+        printf("refree pointer, total %u:", tracer_list.refree_statistic.count);
     }
 
-    p_buf  = print_buf;
-    p_buf += sprintf((char *)p_buf, "refree: ");
+    p_buf = print_buf;
+    p_buf += sprintf((char*)p_buf, "refree: ");
     for (uint16_t i = 0, j = 0; i < TRACER_REFREE_NUM; i++) {
         if (tracer_list.refree_statistic.pos_info[i].file_name) {
             j++;
             p_buf
-                += sprintf((char *)p_buf, "%s(%u)\t",
+                += sprintf((char*)p_buf, "%s(%u)\t",
                            tracer_list.refree_statistic.pos_info[i].file_name,
                            tracer_list.refree_statistic.pos_info[i].func_line);
         }
 
         if (j == 4) {
-            j     = 0;
+            j = 0;
             p_buf = print_buf;
             printf("%s", p_buf);
-            p_buf += sprintf((char *)p_buf, "refree: ");
+            p_buf += sprintf((char*)p_buf, "refree: ");
         } else {
             if ((i == (TRACER_REFREE_NUM - 1)) && j) {
-                j     = 0;
+                j = 0;
                 p_buf = print_buf;
                 printf("%s", p_buf);
-                p_buf += sprintf((char *)p_buf, "refree: ");
+                p_buf += sprintf((char*)p_buf, "refree: ");
             }
         }
     }
+}
 
-    return true;
+static char* get_filename(const char* path)
+{
+#if __linux__
+    char* ptr = strrchr(path, '/');
+#else
+    char* ptr = strrchr(path, '\');
+#endif
+    return ptr + 1;
 }

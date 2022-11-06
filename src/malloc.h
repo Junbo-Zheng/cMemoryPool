@@ -46,7 +46,7 @@ void* mymalloc(uint8_t memx, uint32_t size, char* file_name, uint32_t func_line)
 
 void myfree(void* ptr, char* file_name, uint32_t func_line);
 
-void mymemset(void* s, uint8_t c, uint32_t count);
+void mymemset(void* src, uint8_t c, uint32_t count);
 
 void mymemcpy(void* des, void* src, uint32_t size);
 

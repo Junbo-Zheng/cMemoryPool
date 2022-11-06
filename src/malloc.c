@@ -80,7 +80,9 @@ static struct  {
     MEMPOOL_INIT_READY
 };
 
+#if __linux__
 static pthread_mutex_t mutex[SRAMBANK] = { 0 };
+#endif
 
 static void mutex_creat(uint8_t memx)
 {
@@ -167,9 +169,9 @@ void mymemcpy(void* des, void* src, uint32_t n)
     }
 }
 
-void mymemset(void* s, uint8_t c, uint32_t count)
+void mymemset(void* src, uint8_t c, uint32_t count)
 {
-    uint8_t* p_des = s;
+    uint8_t* p_des = src;
     while (count--) {
         *p_des++ = c;
     }
@@ -185,7 +187,7 @@ void mymem_init(uint8_t memx)
     mutex_creat(memx);
 
 #if CONFIG_MEMORY_POOL_DEBUG
-    init_tracer();
+    memory_pool_debug_init();
 #endif
 }
 
@@ -232,7 +234,7 @@ void myfree(void* ptr, char* file_name, uint32_t func_line)
         uint32_t offset = (uintptr_t)ptr - (uintptr_t)malloc_dev.mempool[memx];
         mymem_free(memx, offset);
 #if CONFIG_MEMORY_POOL_DEBUG
-        del_a_tracer_record(ptr, get_filename(file_name), func_line);
+        memory_pool_debug_del(ptr, file_name, func_line);
 #endif
         mutex_unlock(memx);
     }
@@ -249,8 +251,7 @@ void* mymalloc(uint8_t memx, uint32_t size, char* file_name, uint32_t func_line)
     if (offset != 0xffffffff) {
         addr = (void*)((uintptr_t)malloc_dev.mempool[memx] + offset);
 #if CONFIG_MEMORY_POOL_DEBUG
-        add_a_tracer_record(memx, (uint16_t)size, addr, get_filename(file_name),
-                            func_line);
+        memory_pool_debug_add(memx, size, addr, file_name, func_line);
 #endif
     }
 
