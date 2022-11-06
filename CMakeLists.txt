@@ -1,15 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 
-SET(CMAKE_C_COMPILER /usr/bin/clang)
-
 project(mem_pool LANGUAGES C)
 
 set(SRC
     main.c
     src/malloc.c
 )
-
-set(CMAKE_C_FLAGS "-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer -static-libsan")
 
 option(MEMORY_POOL_DEBUG "memory pool debug"  OFF)
 
