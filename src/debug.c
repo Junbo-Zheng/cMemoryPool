@@ -337,7 +337,7 @@ void memory_pool_debug_trace(void)
     while (p_node) {
         tracer_list.mem_statistic[p_node->memx] += p_node->mem_sz;
 
-        int i = 0;
+        uint16_t i = 0;
         while (i < TRACER_REPEAT_NUM) {
             if (tracer_list.repeat_statistic[i].pos_info.file_name) {
                 if ((tracer_list.repeat_statistic[i].pos_info.file_name
@@ -365,9 +365,9 @@ void memory_pool_debug_trace(void)
     debug_mutex_unlock();
 
     printf("tracer_list.malloc_free_cnt = %d\n", malloc_free_cnt);
-    printf("unused node cnt             = %u\n", unused_node_cnt);
-    printf("used   node cnt             = %u\n", used_node_cnt);
-    printf("tracer_list.flag            = 0x%04x\n", flag);
+    printf("tracer_list.unused node cnt = %u\n", unused_node_cnt);
+    printf("tracer_list.used   node cnt = %u\n", used_node_cnt);
+    printf("tracer_list.flag            = 0x%02x\n", flag);
 
     printf("SRAMIN  : %u\n", tracer_list.mem_statistic[0]);
     printf("SRAMEX  : %u\n", tracer_list.mem_statistic[1]);
@@ -405,6 +405,7 @@ void memory_pool_debug_trace(void)
         printf("refree pointer, total %u:", tracer_list.refree_statistic.count);
     }
 
+    memset(print_buf, 0, sizeof(print_buf));
     p_buf = print_buf;
     p_buf += sprintf((char*)p_buf, "refree: ");
     for (uint16_t i = 0, j = 0; i < TRACER_REFREE_NUM; i++) {
