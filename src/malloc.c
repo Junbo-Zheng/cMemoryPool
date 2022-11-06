@@ -78,17 +78,23 @@ static pthread_mutex_t mutex[SRAMBANK] = { 0 };
 
 static void mutex_creat(uint8_t memx)
 {
+#if __linux__
     pthread_mutex_init(&mutex[memx], NULL);
+#endif
 }
 
 static void mutex_lock(uint8_t memx)
 {
+#if __linux__
     pthread_mutex_lock(&mutex[memx]);
+#endif
 }
 
 static void mutex_unlock(uint8_t memx)
 {
+#if __linux__
     pthread_mutex_unlock(&mutex[memx]);
+#endif
 }
 
 static uint32_t mymem_malloc(uint8_t memx, uint32_t size)
