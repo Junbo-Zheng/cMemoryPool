@@ -103,7 +103,15 @@ static void debug_mutex_unlock(void)
 #endif
 }
 
-static char* get_filename(const char* path);
+static char* get_filename(const char* path)
+{
+#if __linux__
+    char* ptr = strrchr(path, '/');
+#else
+    char* ptr = strrchr(path, '\\');
+#endif
+    return ptr + 1;
+}
 
 void memory_pool_debug_init(void)
 {
@@ -422,14 +430,4 @@ void memory_pool_debug_trace(void)
             }
         }
     }
-}
-
-static char* get_filename(const char* path)
-{
-#if __linux__
-    char* ptr = strrchr(path, '/');
-#else
-    char* ptr = strrchr(path, '\');
-#endif
-    return ptr + 1;
 }
