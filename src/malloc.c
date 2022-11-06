@@ -3,7 +3,9 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#if __linux__
 #include <pthread.h>
+#endif
 
 #define MEMPOOL_INIT_READY 0
 #define MEMPOOL_INIT_DONE  1
