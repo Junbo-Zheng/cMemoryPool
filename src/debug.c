@@ -5,7 +5,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#if __linux__
 #include <pthread.h>
+#endif
 
 #include "malloc.h"
 
@@ -77,17 +79,23 @@ static pthread_mutex_t mutex = { 0 };
 
 static void debug_mutex_init(void)
 {
+#if __linux__
     pthread_mutex_init(&mutex, NULL);
+#endif
 }
 
 static void debug_mutex_lock(void)
 {
+#if __linux__
     pthread_mutex_lock(&mutex);
+#endif
 }
 
 static void debug_mutex_unlock(void)
 {
+#if __linux__
     pthread_mutex_unlock(&mutex);
+#endif
 }
 
 static void init_tracer(void)
