@@ -14,11 +14,14 @@ set(CMAKE_C_FLAGS "-fsanitize=address -fsanitize=undefined -fno-omit-frame-point
 option(MEMORY_POOL_DEBUG "memory pool debug"  OFF)
 
 if(MEMORY_POOL_DEBUG)
-  target_compile_definitions(adbd PUBLIC -DCONFIG_MEMORY_POOL_DEBUG)
   set(SRC ${SRC} src/debug.c)
 endif()
 
 add_executable(mem_pool ${SRC})
+
+if(MEMORY_POOL_DEBUG)
+  target_compile_definitions(mem_pool PUBLIC -DCONFIG_MEMORY_POOL_DEBUG=1)
+endif()
 
 add_compile_options(-Wall -Wextra -Werror -Wno-format -g)
 
