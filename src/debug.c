@@ -380,7 +380,7 @@ void memory_pool_debug_trace(void)
     for (uint16_t i = 0, j = 0; i < TRACER_REPEAT_NUM; i++) {
         if (tracer_list.repeat_statistic[i].count) {
             j++;
-            p_buf += sprintf((char*)p_buf, "%s(%u) = %u\n",
+            p_buf += sprintf((char*)p_buf, "%s(%u) = %u\t",
                              tracer_list.repeat_statistic[i].pos_info.file_name,
                              tracer_list.repeat_statistic[i].pos_info.func_line,
                              tracer_list.repeat_statistic[i].count);
@@ -401,8 +401,10 @@ void memory_pool_debug_trace(void)
         }
     }
 
+    printf("\n");
+
     if (tracer_list.refree_statistic.count) {
-        printf("refree pointer, total %u:", tracer_list.refree_statistic.count);
+        printf("refree total count: %u\n", tracer_list.refree_statistic.count);
     }
 
     memset(print_buf, 0, sizeof(print_buf));
@@ -431,4 +433,5 @@ void memory_pool_debug_trace(void)
             }
         }
     }
+    printf("\n");
 }
