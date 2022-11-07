@@ -43,6 +43,17 @@ int main(void)
         printf("ptr1 malloc fail\n");
     }
 
+    for (uint8_t i = 0; i < 6; i++) {
+        uint8_t* unused_ptr = MYMALLOC(SRAMEX1, 100);
+        if (unused_ptr == NULL) {
+            printf("%d malloc fail\n", i);
+        }
+    }
+
+    uint8_t* refree_ptr = ptr;
+    MYFREE(ptr);
+    MYFREE(refree_ptr);
+
     atexit(exit_function);
     return 0;
 }
