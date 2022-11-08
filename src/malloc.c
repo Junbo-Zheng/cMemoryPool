@@ -179,9 +179,14 @@ void mymemset(void* src, uint8_t c, uint32_t count)
 
 void mymem_init(uint8_t memx)
 {
-    mymemset(malloc_dev.memtable[memx], 0,
-             memtablesize[memx] * sizeof(uint16_t));
-    mymemset(malloc_dev.mempool[memx], 0, mempoolsize[memx]);
+    mymemset(malloc_dev.memtable[memx],
+            0,
+            memtablesize[memx] * sizeof(uint16_t));
+
+    mymemset(malloc_dev.mempool[memx],
+            0,
+            mempoolsize[memx]);
+
     malloc_dev.memready[memx] = MEMPOOL_INIT_DONE;
 
     mutex_creat(memx);
@@ -208,25 +213,22 @@ void myfree(void* ptr, char* file_name, uint32_t func_line)
     uint32_t ptr_data = (uint32_t)(uintptr_t)ptr;
 
     uint8_t memx = 0xff;
+
     if (ptr != NULL) {
-        if ((ptr_data >= (uint32_t)(uintptr_t)mem1pool)
-            && ((ptr_data < (uint32_t)(uintptr_t)mem1pool + MEM1_POOL_SIZE))) {
+        if ((ptr_data >= (uint32_t)(uintptr_t)mem1pool) &&
+            ((ptr_data < (uint32_t)(uintptr_t)mem1pool + MEM1_POOL_SIZE))) {
             memx = SRAMIN;
-        } else if ((ptr_data >= (uint32_t)(uintptr_t)mem2pool)
-                   && ((ptr_data
-                        < (uint32_t)(uintptr_t)mem2pool + MEM2_POOL_SIZE))) {
+        } else if ( (ptr_data >= (uint32_t)(uintptr_t)mem2pool) &&
+                    ((ptr_data < (uint32_t)(uintptr_t)mem2pool + MEM2_POOL_SIZE))) {
             memx = SRAMEX;
-        } else if ((ptr_data >= (uint32_t)(uintptr_t)mem3pool)
-                   && ((ptr_data
-                        < (uint32_t)(uintptr_t)mem3pool + MEM3_POOL_SIZE))) {
+        } else if ( (ptr_data >= (uint32_t)(uintptr_t)mem3pool) &&
+                    ((ptr_data < (uint32_t)(uintptr_t)mem3pool + MEM3_POOL_SIZE))) {
             memx = SRAMCCM;
-        } else if ((ptr_data >= (uint32_t)(uintptr_t)mem4pool)
-                   && ((ptr_data
-                        < (uint32_t)(uintptr_t)mem4pool + MEM4_POOL_SIZE))) {
+        } else if ( (ptr_data >= (uint32_t)(uintptr_t)mem4pool) &&
+                    ((ptr_data < (uint32_t)(uintptr_t)mem4pool + MEM4_POOL_SIZE))) {
             memx = SRAMEX1;
-        } else if ((ptr_data >= (uint32_t)(uintptr_t)mem5pool)
-                   && ((ptr_data
-                        < (uint32_t)(uintptr_t)mem5pool + MEM5_POOL_SIZE))) {
+        } else if ((ptr_data >= (uint32_t)(uintptr_t)mem5pool) &&
+                    ((ptr_data < (uint32_t)(uintptr_t)mem5pool + MEM5_POOL_SIZE))) {
             memx = SRAMEX2;
         } else {
             memx = 0xff;
@@ -270,8 +272,7 @@ void* myrealloc(uint8_t memx, void* ptr, uint32_t size)
     mutex_lock(memx);
     uint32_t offset = mymem_malloc(memx, size);
     if (offset != 0xffffffff) {
-        mymemcpy((void*)((uintptr_t)malloc_dev.mempool[memx] + offset), ptr,
-                 size);
+        mymemcpy((void*)((uintptr_t)malloc_dev.mempool[memx] + offset), ptr, size);
         MYFREE(ptr);
         ptr = NULL;
         mutex_unlock(memx);
