@@ -57,9 +57,4 @@ uint8_t mem_perused(uint8_t memx);
 void* myrealloc(uint8_t memx, void* ptr, uint32_t size);
 #endif
 
-#if CONFIG_MEMORY_POOL_DEBUG
-int32_t get_tracer_malloc_free_cnt(void);
-bool printf_tracer_info(void);
-#endif
-
 #endif /* _MALLOC_H_ */
