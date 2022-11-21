@@ -245,8 +245,6 @@ void myfree(void* ptr, char* file_name, uint32_t func_line)
 #endif
         mutex_unlock(memx);
     }
-
-    ptr = NULL;
 }
 
 void* mymalloc(uint8_t memx, uint32_t size, char* file_name, uint32_t func_line)
