@@ -1,7 +1,7 @@
-#include "./src/malloc.h"
+#include "malloc.h"
 
 #if CONFIG_MEMORY_POOL_DEBUG
-#include "./src/debug.h"
+#include "debug.h"
 #endif
 
 #include <stdio.h>
