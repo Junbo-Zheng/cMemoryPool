@@ -9,14 +9,14 @@
 
 static void exit_function(void)
 {
-    printf("exit funxtion run start\n");
+    printf("exit function run start\n");
 
 #if CONFIG_MEMORY_POOL_DEBUG
     memory_pool_debug_trace();
     printf("malloc free count: %d\n", memory_pool_debug_malloc_free_count());
 #endif
 
-    printf("exit funxtion run end\n");
+    printf("exit function run end\n");
 }
 
 int main(void)
