@@ -1,28 +1,38 @@
 name: build
 
-on: [push, pull_request]
+on:
+  pull_request:
+    paths-ignore:
+      - 'Documentation/**'
+  push:
+    paths-ignore:
+      - 'Documentation/**'
+    branches:
+      - master
+      - 'releases/*'
+    tags:
 
 jobs:
-  Linux:
-    runs-on: ubuntu-latest
+  build-gcc:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install cmake gcc
-
-      - name: build project
-        run: |
-          cmake -H. -Bbuild
-          cd build
-          make -j8
-
-      - name: build test
-        run: |
-          cmake -H. -Bbuild -DMEMORY_POOL_DEBUG=ON
-          cd build
-          make -j8
+    - uses: actions/checkout@v3
+    - run: cmake -H. -Bbuild -DMEMORY_POOL_DEBUG=ON
+    - run: cmake --build build -j16
+    # - run: ./build/mem_pool
+  build-clang:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+    - uses: actions/checkout@v3
+    - run: cmake -H. -Bbuild -DMEMORY_POOL_DEBUG=ON
+    - run: cmake --build build -j16
+    # - run: ./build/mem_pool
