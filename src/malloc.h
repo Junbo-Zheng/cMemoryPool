@@ -21,6 +21,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifndef UNUSED
+#define UNUSED(x) ((void)(x))
+#endif /* UNUSED */
+
 #define SRAMIN   0x00
 #define SRAMEX   0x01
 #define SRAMCCM  0x02
