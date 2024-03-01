@@ -78,23 +78,12 @@ static struct  {
 
     mem_perused,
 
-    mem1pool,
-    mem2pool,
-    mem3pool,
-    mem4pool,
-    mem5pool,
+    {mem1pool,  mem2pool,  mem3pool,  mem4pool,  mem5pool},
 
-    mem1table,
-    mem2table,
-    mem3table,
-    mem4table,
-    mem5table,
+    {mem1table, mem2table, mem3table, mem4table, mem5table},
 
-    MEMPOOL_INIT_READY,
-    MEMPOOL_INIT_READY,
-    MEMPOOL_INIT_READY,
-    MEMPOOL_INIT_READY,
-    MEMPOOL_INIT_READY
+    {MEMPOOL_INIT_READY, MEMPOOL_INIT_READY, MEMPOOL_INIT_READY,
+     MEMPOOL_INIT_READY, MEMPOOL_INIT_READY},
 };
 
 #if __linux__
@@ -105,6 +94,8 @@ static void mutex_creat(uint8_t memx)
 {
 #if __linux__
     pthread_mutex_init(&mutex[memx], NULL);
+#else
+    UNUSED(memx);
 #endif
 }
 
@@ -112,6 +103,8 @@ static void mutex_lock(uint8_t memx)
 {
 #if __linux__
     pthread_mutex_lock(&mutex[memx]);
+#else
+    UNUSED(memx);
 #endif
 }
 
@@ -119,6 +112,8 @@ static void mutex_unlock(uint8_t memx)
 {
 #if __linux__
     pthread_mutex_unlock(&mutex[memx]);
+#else
+    UNUSED(memx);
 #endif
 }
 
@@ -259,6 +254,9 @@ void myfree(void* ptr, char* file_name, uint32_t func_line)
         mymem_free(memx, offset);
 #if CONFIG_MEMORY_POOL_DEBUG
         memory_pool_debug_del(ptr, file_name, func_line);
+#else
+    UNUSED(file_name);
+    UNUSED(func_line);
 #endif
         mutex_unlock(memx);
     }
@@ -274,6 +272,9 @@ void* mymalloc(uint8_t memx, uint32_t size, char* file_name, uint32_t func_line)
         addr = (void*)((uintptr_t)malloc_dev.mempool[memx] + offset);
 #if CONFIG_MEMORY_POOL_DEBUG
         memory_pool_debug_add(memx, size, addr, file_name, func_line);
+#else
+    UNUSED(file_name);
+    UNUSED(func_line);
 #endif
     }
 
