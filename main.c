@@ -40,7 +40,8 @@ int main(void)
         printf("ptr1 malloc ok, addr: %p\n", ptr1);
         printf("ptr1 memory use info: %d%%\n", mem_perused(SRAMCCM));
     } else {
-        printf("ptr1 malloc fail\n");
+        printf("ptr1 malloc fail, since memory usage: %d%%\n",
+               mem_perused(SRAMCCM));
     }
 
     for (uint8_t i = 0; i < 6; i++) {
