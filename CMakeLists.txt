@@ -1,28 +1,17 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.23)
 
 project(mem_pool LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(MEMORY_POOL_DEBUG "memory pool debug"  OFF)
-
-include_directories(${PROJECT_SOURCE_DIR}/src)
-
 add_compile_options(-Wall -Wextra -Werror -Wno-format -g)
 
-set(SRC
-    main.c
-    src/malloc.c
-)
+add_subdirectory(src)
 
-if(MEMORY_POOL_DEBUG)
-  set(SRC ${SRC} src/debug.c)
-endif()
+set(SRC main.c)
 
-add_executable(mem_pool ${SRC})
+add_executable(mem_pool_test ${SRC})
 
-if(MEMORY_POOL_DEBUG)
-  target_compile_definitions(mem_pool PUBLIC -DCONFIG_MEMORY_POOL_DEBUG=1)
-endif()
+target_link_libraries(mem_pool_test PRIVATE memory_pool)
 
-target_include_directories(mem_pool PRIVATE "${CMAKE_SOURCE_DIR}/src/")
+target_include_directories(mem_pool_test PRIVATE src)
