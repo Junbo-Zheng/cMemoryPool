@@ -10,8 +10,8 @@ add_subdirectory(src)
 
 set(SRC main.c)
 
-add_executable(mem_pool_test ${SRC})
+add_executable(memorypool ${SRC})
 
-target_link_libraries(mem_pool_test PRIVATE memory_pool)
+target_link_libraries(memorypool PRIVATE memory_pool)
 
-target_include_directories(mem_pool_test PRIVATE src)
+target_include_directories(memorypool PRIVATE src)
