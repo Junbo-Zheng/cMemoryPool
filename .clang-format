@@ -29,7 +29,6 @@ AlignEscapedNewlines: Left
 AlignOperands: Align
 TabWidth: 4
 UseTab: Never
-AlignOperands: true
 AlignEscapedNewlinesLeft: true
 AllowShortCaseLabelsOnASingleLine: false
 Cpp11BracedListStyle: false
