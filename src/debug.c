@@ -121,10 +121,14 @@ static void debug_mutex_unlock(void)
 
 static char* get_filename(const char* path)
 {
-#if __linux__
+#if defined(__linux__)
     char* ptr = strrchr(path, '/');
-#else
+#elif defined(__APPLE__)
+    char* ptr = strrchr(path, '/');
+#elif defined(_WIN32)
     char* ptr = strrchr(path, '\\');
+#else
+    return NULL;
 #endif
     return ptr + 1;
 }
