@@ -23,3 +23,6 @@ target_include_directories(memory_pool PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 # Add compile options for the memory pool target
 target_compile_options(memory_pool PRIVATE -Wall -Wextra -Werror -Wno-format -g)
+
+add_custom_target(update_timestamp COMMAND ${CMAKE_COMMAND} -E touch
+                                           ${CMAKE_CURRENT_LIST_DIR}/malloc.c)
