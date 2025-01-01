@@ -15,3 +15,5 @@ add_executable(memorypool ${SRC})
 target_link_libraries(memorypool PRIVATE memory_pool)
 
 target_include_directories(memorypool PRIVATE src)
+
+add_dependencies(memorypool update_timestamp)

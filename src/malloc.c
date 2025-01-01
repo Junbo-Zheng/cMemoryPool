@@ -206,6 +206,8 @@ void mymem_init(uint8_t memx)
 #if CONFIG_MEMORY_POOL_DEBUG
     memory_pool_debug_init();
 #endif
+
+    printf("Memory pool %d init done %s\n", memx, __TIMESTAMP__);
 }
 
 uint8_t mem_perused(uint8_t memx)
